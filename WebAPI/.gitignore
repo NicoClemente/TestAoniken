@@ -1,0 +1,5 @@
+# Ignorar appsettings.json
+appsettings.json
+
+# Ignorar la carpeta Migrations y su contenido
+**/Migrations/
