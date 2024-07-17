@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net.Mail;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 using TestAoniken.Data;
@@ -22,58 +23,99 @@ namespace TestAoniken.Servicios
         public async Task<List<Publicacion>> ObtenerPublicacionesPendientesAsync()
         {
             return await _context.Publicaciones
+                .AsNoTracking()
                 .Include(p => p.Autor)
                 .Where(p => p.PendienteAprobacion)
                 .ToListAsync();
         }
 
-        public async Task<bool> AprobarPublicacionAsync(int idPublicacion)
+        public async Task<OperationResult> AprobarPublicacionAsync(int idPublicacion)
         {
-            if (idPublicacion <= 0)
+            var result = new OperationResult();
+
+            try
             {
-                throw new ArgumentException("El ID de la publicación debe ser un número positivo.");
+                if (idPublicacion <= 0)
+                {
+                    throw new ArgumentException("El ID de la publicación debe ser un número positivo.");
+                }
+
+                var publicacion = await _context.Publicaciones
+                    .Include(p => p.Autor)
+                    .FirstOrDefaultAsync(p => p.Id == idPublicacion);
+
+                if (publicacion == null)
+                {
+                    result.ErrorMessage = "Publicación no encontrada.";
+                    return result;
+                }
+
+                if (!publicacion.PendienteAprobacion)
+                {
+                    throw new InvalidOperationException("La publicación ya está aprobada.");
+                }
+
+                publicacion.PendienteAprobacion = false;  // Cambiar el estado de pendiente a aprobado
+                await _context.SaveChangesAsync();  // Guardar los cambios en la base de datos
+
+                // Enviar notificación por correo electrónico
+                await _emailService.SendEmailAsync(publicacion.AutorId, "Publicación aprobada",
+                    $"Tu publicación '{publicacion.Titulo}' ha sido aprobada.");
+
+                result.Success = true;
+                return result;
             }
-
-            var publicacion = await _context.Publicaciones
-                .Include(p => p.Autor)
-                .FirstOrDefaultAsync(p => p.Id == idPublicacion);
-
-            if (publicacion == null)
+            catch (ArgumentException ex)
             {
-                return false;  // Si no se encuentra la publicación, retornar falso
+                result.ErrorMessage = ex.Message;
+                return result;
             }
-
-            if (!publicacion.PendienteAprobacion)
+            catch (InvalidOperationException ex)
             {
-                throw new InvalidOperationException("La publicación ya está aprobada.");
+                result.ErrorMessage = ex.Message;
+                return result;
             }
-
-            publicacion.PendienteAprobacion = false;  // Cambiar el estado de pendiente a aprobado
-            await _context.SaveChangesAsync();  // Guardar los cambios en la base de datos
-
-            // Enviar notificación por correo electrónico
-            await _emailService.SendEmailAsync(publicacion.AutorId, "Publicación aprobada",
-                $"Tu publicación '{publicacion.Titulo}' ha sido aprobada.");
-
-            return true;  // Retornar verdadero indicando que la operación fue exitosa
+            catch (DbUpdateException)
+            {
+                result.ErrorMessage = "Error al actualizar la base de datos.";
+                return result;
+            }
+            catch (SmtpException)
+            {
+                result.ErrorMessage = "Error al enviar el correo electrónico.";
+                return result;
+            }
+            catch (Exception)
+            {
+                result.ErrorMessage = "Ocurrió un error inesperado.";
+                return result;
+            }
         }
 
         public async Task<bool> RechazarPublicacionAsync(int idPublicacion)
         {
-            if (idPublicacion <= 0)
+            try
             {
-                throw new ArgumentException("El ID de la publicación debe ser un número positivo.");
+                if (idPublicacion <= 0)
+                {
+                    throw new ArgumentException("El ID de la publicación debe ser un número positivo.");
+                }
+
+                var publicacion = await _context.Publicaciones.FindAsync(idPublicacion);  // Buscar la publicación por su ID
+                if (publicacion == null)
+                {
+                    return false;  // Si no se encuentra la publicación, retornar falso
+                }
+
+                _context.Publicaciones.Remove(publicacion);  // Eliminar la publicación de la base de datos
+                await _context.SaveChangesAsync();  // Guardar los cambios en la base de datos
+                return true;  // Retornar verdadero indicando que la operación fue exitosa
             }
 
-            var publicacion = await _context.Publicaciones.FindAsync(idPublicacion);  // Buscar la publicación por su ID
-            if (publicacion == null)
-            {
-                return false;  // Si no se encuentra la publicación, retornar falso
+            catch (ArgumentException) { 
+            
+                return false;
             }
-
-            _context.Publicaciones.Remove(publicacion);  // Eliminar la publicación de la base de datos
-            await _context.SaveChangesAsync();  // Guardar los cambios en la base de datos
-            return true;  // Retornar verdadero indicando que la operación fue exitosa
         }
 
         public async Task<bool> ActualizarPublicacionAsync(int id, Publicacion publicacionActualizada)

@@ -16,6 +16,7 @@ namespace TestAoniken.Models
         public string Rol { get; set; }
         public string Email { get; set; }
 
+        
         public virtual ICollection<Publicacion> Publicaciones { get; set; }
     }
 }

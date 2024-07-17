@@ -26,7 +26,7 @@ namespace TestAoniken.Controllers
 
             if (publicacionesPendientes == null || publicacionesPendientes.Count == 0)
             {
-                return NotFound("No se encontraron publicaciones pendientes.");
+                return NotFound();
             }
 
             return Ok(publicacionesPendientes); // Retorna las publicaciones pendientes
@@ -37,11 +37,11 @@ namespace TestAoniken.Controllers
         public async Task<IActionResult> AprobarPublicacion(int id)
         {
             var resultado = await _publicacionService.AprobarPublicacionAsync(id);
-            if (resultado)
+            if (resultado.Success)
             {
                 return Ok(true);
             }
-            return NotFound();
+            return BadRequest(new { success = false, error = resultado.ErrorMessage });
         }
 
         // Endpoint para rechazar una publicación (Eliminar)
