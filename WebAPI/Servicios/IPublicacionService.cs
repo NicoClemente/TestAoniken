@@ -7,7 +7,7 @@ namespace TestAoniken.Servicios
     public interface IPublicacionService
     {
         Task<List<Publicacion>> ObtenerPublicacionesPendientesAsync();
-        Task<bool> AprobarPublicacionAsync(int idPublicacion);
+        Task<OperationResult> AprobarPublicacionAsync(int idPublicacion);
         Task<bool> RechazarPublicacionAsync(int idPublicacion);
         Task<bool> ActualizarPublicacionAsync(int id, Publicacion publicacionActualizada);
         Task<bool> EliminarPublicacionAsync(int id);
